@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Ứng dụng chat AI thông minh sử dụng Flask Python kết hợp Groq API và Llama 3.3.">
+    <title>Groq AI Assistant - Chat thông minh</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Highlight.js -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/github-dark.min.css') }}">
+    <script src="{{ url_for('static', filename='js/highlight.min.js') }}"></script>
+    
+    <!-- Marked.js v9 (stable API) -->
+    <script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4.0">
+</head>
+<body>
+    <div id="error-banner" style="display:none; position:fixed; top:0; left:0; width:100%; background:red; color:white; padding:10px; z-index:9999;"></div>
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            var banner = document.getElementById('error-banner');
+            banner.style.display = 'block';
+            banner.innerHTML = 'JS Error: ' + msg + '<br>Line: ' + lineNo + '<br>Col: ' + columnNo + '<br>URL: ' + url;
+            return false;
+        };
+        window.addEventListener("unhandledrejection", function(e) {
+            var banner = document.getElementById('error-banner');
+            banner.style.display = 'block';
+            banner.innerHTML = 'Promise Error: ' + e.reason;
+        });
+    </script>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <h2>Groq AI</h2>
+                </div>
+                <button class="close-sidebar-btn" id="close-sidebar-id" aria-label="Đóng sidebar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <button class="new-chat-btn" id="new-chat-btn-id" type="button">
+                <i class="fa-solid fa-plus"></i>
+                <span>Cuộc trò chuyện mới</span>
+            </button>
+            
+            <div class="chat-history-container">
+                <div class="history-label">Lịch sử trò chuyện</div>
+                <ul class="chat-history-list" id="chat-history-list-id"></ul>
+            </div>
+            
+            <div class="sidebar-footer">
+                <button class="settings-btn" id="open-settings-btn-id" type="button">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Cài đặt API Key</span>
+                </button>
+                <button class="clear-history-btn" id="clear-history-btn-id" type="button">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Xóa toàn bộ lịch sử</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <div class="header-left">
+                    <button class="toggle-sidebar-btn" id="toggle-sidebar-btn-id" type="button" aria-label="Mở sidebar">
+                        <i class="fa-solid fa-bars-staggered"></i>
+                    </button>
+                    <div class="model-info">
+                        <span class="model-badge">Llama 3.3 · Groq</span>
+                        <span class="status-indicator online"></span>
+                        <span class="status-text">Sẵn sàng</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="key-status-badge missing" id="key-status-badge-id">
+                        <i class="fa-solid fa-key"></i>
+                        <span id="key-status-text">Đang kiểm tra...</span>
+                    </div>
+                </div>
+            </header>
+            
+            <section class="messages-container" id="messages-container-id">
+                <!-- Empty State -->
+                <div class="empty-state" id="empty-state-id">
+                    <div class="empty-icon">
+                        <i class="fa-solid fa-comments"></i>
+                    </div>
+                    <h1>Tôi có thể giúp gì cho bạn?</h1>
+                    <p>Hãy hỏi tôi bất kỳ điều gì — code, toán học, dịch thuật hay sáng tạo nội dung.</p>
+                    <div class="suggested-prompts">
+                        <div class="prompt-card" onclick="setPrompt('Viết hàm Flask kết nối SQLite')">
+                            <i class="fa-solid fa-code text-violet"></i>
+                            <span>Viết hàm Flask kết nối SQLite</span>
+                        </div>
+                        <div class="prompt-card" onclick="setPrompt('Giải thích thuyết tương đối')">
+                            <i class="fa-solid fa-lightbulb text-amber"></i>
+                            <span>Giải thích thuyết tương đối</span>
+                        </div>
+                        <div class="prompt-card" onclick="setPrompt('Viết email xin nghỉ phép')">
+                            <i class="fa-solid fa-pen-fancy text-emerald"></i>
+                            <span>Viết email xin nghỉ phép</span>
+                        </div>
+                        <div class="prompt-card" onclick="setPrompt('Thực đơn lành mạnh giàu protein')">
+                            <i class="fa-solid fa-utensils text-rose"></i>
+                            <span>Thực đơn lành mạnh giàu protein</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Messages Feed -->
+                <div class="messages-feed" id="messages-feed-id" style="display:none;"></div>
+                
+                <!-- Typing Indicator -->
+                <div class="typing-indicator-container" id="typing-indicator-id" style="display: none;">
+                    <div class="bot-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="typing-bubble">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Input Area -->
+            <footer class="input-area">
+                <div class="input-form">
+                    <div class="input-wrapper" id="input-wrapper-id">
+                        <textarea id="user-input-id" placeholder="Nhập tin nhắn..." rows="1"></textarea>
+                        <button type="button" class="send-btn" id="send-btn-id" aria-label="Gửi tin nhắn">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-footer">
+                    Groq AI Chatbot · Flask Python · Llama 3.3 70B
+                </div>
+            </footer>
+        </main>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal-id">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-gear"></i> Cài đặt API Key</h3>
+                <button class="close-modal-btn" id="close-modal-btn-id" type="button">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">
+                    API Key được lưu cục bộ trong trình duyệt hoặc đọc từ file <code>.env</code> phía máy chủ.
+                </p>
+                <div class="form-group">
+                    <label for="api-key-input-id">Groq API Key:</label>
+                    <div class="input-group">
+                        <input type="password" id="api-key-input-id" placeholder="gsk_..." autocomplete="off">
+                        <button type="button" class="toggle-password-btn" id="toggle-password-btn-id" aria-label="Hiện mật khẩu">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                    <small>
+                        Chưa có API Key? Đăng ký miễn phí tại
+                        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq Console <i class="fa-solid fa-arrow-up-right-from-square"></i></a>.
+                    </small>
+                </div>
+                <div class="key-test-result" id="key-test-result-id" style="display: none;">
+                    <div class="test-message"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="test-key-btn-id">Kiểm tra kết nối</button>
+                <button type="button" class="btn btn-primary" id="save-key-btn-id">Lưu cấu hình</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=8.0"></script>
+</body>
+</html>

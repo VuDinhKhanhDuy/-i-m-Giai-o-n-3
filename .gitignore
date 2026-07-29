@@ -1,0 +1,17 @@
+# Python ignore
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# Environment configurations
+.env
+
+# IDE configurations
+.vscode/
+.idea/
+.DS_Store
